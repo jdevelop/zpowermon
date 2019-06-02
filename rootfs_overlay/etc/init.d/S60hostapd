@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Start/stop dhcpcd
+#
+
+CONFIG=/etc/hostapd.conf
+PIDFILE=/var/run/hostapd.pid
+
+[ -f $CONFIG ] || exit 0
+
+case "$1" in
+  start)
+	echo "Starting hostapd..."
+	hostapd -i wlan0 -P "${PIDFILE}" "${CONFIG}"
+	;;
+  stop)
+	echo "Stopping dhcpcd..."
+	kill `cat ${PIDFILE}`
+	;;
+  restart)
+	"$0" stop
+	sleep 1 # Prevent race condition: ensure dhcpcd stops before start.
+	"$0" start
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart|reload|force-reload}"
+	exit 1
+esac
