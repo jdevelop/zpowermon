@@ -11,7 +11,7 @@ PIDFILE=/var/run/hostapd.pid
 case "$1" in
   start)
 	echo "Starting hostapd..."
-	hostapd -i wlan0 -P "${PIDFILE}" "${CONFIG}"
+	hostapd -B -i wlan0 -P "${PIDFILE}" "${CONFIG}"
 	;;
   stop)
 	echo "Stopping dhcpcd..."
