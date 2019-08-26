@@ -1,0 +1,2 @@
+{"Time":"2018-03-07T13:34:36.481726295-05:00","Offset":0,"Length":0,"Message":{"FrameSync":5795,"ProtocolID":30,"EndpointType":110,"EndpointID":100490102,"Consumption":504816,"Tamper":45,"PacketCRC":19188}}
+{"Time":"2018-04-10T20:02:34.134469074-04:00","Offset":0,"Length":0,"Message":{"ID":16924188,"Type":8,"TamperPhy":0,"TamperEnc":0,"Consumption":256271,"ChecksumVal":10589}}
