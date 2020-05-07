@@ -51,11 +51,11 @@ func (db *Database) AddEvent(event *firmware.PowerEvent) error {
 		return err
 	}
 	tags := map[string]string{
-		"meterid": strconv.FormatUint(uint64(event.GetId()), 10),
+		"meterid": strconv.FormatUint(uint64(event.Message.EndpointID), 10),
 	}
 
 	pointData := map[string]interface{}{
-		"meterid":     event.GetId() * 1.0,
+		"meterid":     event.Message.EndpointID * 1.0,
 		"consumption": event.Message.Consumption * 1.0,
 	}
 
