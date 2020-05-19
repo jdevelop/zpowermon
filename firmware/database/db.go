@@ -9,13 +9,11 @@ import (
 )
 
 type Database struct {
-	Address  string
-	Username string
-	Password string
-	dbh      client.Client
+	dbname string
+	dbh    client.Client
 }
 
-func Connect(host string, port int, username, password string) (*Database, error) {
+func Connect(dbname, host string, port int, username, password string) (*Database, error) {
 
 	address := fmt.Sprintf("http://%s:%d", host, port)
 
@@ -30,21 +28,17 @@ func Connect(host string, port int, username, password string) (*Database, error
 	}
 
 	db := &Database{
-		Address:  address,
-		Username: username,
-		Password: password,
-		dbh:      c,
+		dbname: dbname,
+		dbh:    c,
 	}
 
 	return db, nil
 
 }
 
-const DBName = "powerlogs"
-
 func (db *Database) AddEvent(event *firmware.PowerEvent) error {
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  DBName,
+		Database:  db.dbname,
 		Precision: "s",
 	})
 	if err != nil {

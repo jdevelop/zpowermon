@@ -1,12 +1,12 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/bemasher/rtlamr/idm"
@@ -22,45 +22,74 @@ import (
 )
 
 const (
-	rtlTcpHost = "127.0.0.1"
-	rtlTcpPort = "1234"
+	envRtlTcpHost  = "RTL_TCP_HOST"
+	envRtlTcpPort  = "RTL_TCP_PORT"
+	envInfluxHost  = "INFLUXDB_HOST"
+	envInfluxPort  = "INFLUXDB_PORT"
+	envInfluxUser  = "INFLUXDB_USER"
+	envInfluxPass  = "INFLUXDB_PASS"
+	envInfluxName  = "INFLUXDB_NAME"
+	envEmbedRTLTCP = "EMBED_RTLTCP"
 )
+
+var Version string
+
+func getOSEnv(name string, value *string) error {
+	if v, ok := os.LookupEnv(name); ok {
+		*value = v
+		return nil
+	} else {
+		return fmt.Errorf("can't find environment variable %s", name)
+	}
+}
+
+func asInt(src string) int {
+	if v, err := strconv.ParseInt(src, 10, 64); err != nil {
+		panic(err)
+	} else {
+		return int(v)
+	}
+}
 
 func main() {
 
-	path := flag.String("path", "", "Path to the log file")
-	host := flag.String("host", "localhost", "Hostname for InfluxDB")
-	port := flag.Int("port", 8086, "Port of InfluxDB")
-
-	flag.Parse()
-
-	if *path == "" {
-		flag.Usage()
-		os.Exit(1)
+	var (
+		influxDbName, influxHost, influxPort, influxUser, influxPwd, rtlHost, rtlPort string
+	)
+	for _, kv := range []struct {
+		name  string
+		value *string
+	}{{envRtlTcpHost, &rtlHost}, {envRtlTcpPort, &rtlPort}, {envInfluxHost, &influxHost},
+		{envInfluxPort, &influxPort}, {envInfluxUser, &influxUser}, {envInfluxPass, &influxPwd}, {envInfluxName, &influxDbName}} {
+		if err := getOSEnv(kv.name, kv.value); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	db, err := database.Connect(*host, *port, "", "")
+	db, err := database.Connect(influxDbName, influxHost, asInt(influxPort), influxUser, envInfluxPass)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	c := make(chan os.Signal, 1)
-	defer close(c)
-	signal.Notify(c, os.Interrupt, os.Kill)
-	go func() {
-		cmd := exec.Command("rtl_tcp", "-a", rtlTcpHost, "-p", rtlTcpPort)
-		go func(cmd *exec.Cmd) {
-			<-c
-			cmd.Process.Kill()
-		}(cmd)
-		if err := cmd.Run(); err != nil {
-			log.Println(err)
-		}
-	}()
+	if os.Getenv(envEmbedRTLTCP) == "true" {
+		var c = make(chan os.Signal, 1)
+		defer close(c)
+		signal.Notify(c, os.Interrupt, os.Kill)
+		go func() {
+			cmd := exec.Command("rtl_tcp", "-a", rtlHost, "-p", rtlPort)
+			go func(cmd *exec.Cmd) {
+				<-c
+				cmd.Process.Kill()
+			}(cmd)
+			if err := cmd.Run(); err != nil {
+				log.Println(err)
+			}
+		}()
 
-	time.Sleep(5 * time.Second)
+		time.Sleep(5 * time.Second)
+	}
 
-	m, err := meter.NewMeter(rtlTcpHost + ":" + rtlTcpPort)
+	m, err := meter.NewMeter(rtlHost + ":" + rtlPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,17 +101,17 @@ func main() {
 		var consumption uint
 		for msg := range msgChan {
 			switch m := msg.(type) {
-			case *scm.SCM:
+			case scm.SCM:
 				consumption = uint(m.Consumption)
-			case *scmplus.SCM:
+			case scmplus.SCM:
 				consumption = uint(m.Consumption)
-			case *idm.IDM:
+			case idm.IDM:
 				consumption = uint(m.LastConsumptionCount)
-			case *netidm.NetIDM:
+			case netidm.NetIDM:
 				consumption = uint(m.LastConsumption)
-			case *r900.R900:
+			case r900.R900:
 				consumption = uint(m.Consumption)
-			case *r900bcd.R900BCD:
+			case r900bcd.R900BCD:
 				consumption = uint(m.Consumption)
 			}
 			if err := db.AddEvent(&firmware.PowerEvent{
@@ -97,8 +126,9 @@ func main() {
 		}
 	}()
 
+	log.Println("Starting ZPowerMon version", Version)
+
 	if err := m.Run(msgChan); err != nil {
-		close(c)
 		log.Fatal(err)
 	}
 

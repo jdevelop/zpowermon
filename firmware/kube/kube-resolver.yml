@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zpowermon
+  namespace: logs
+  labels:
+    app: zpowermon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zpowermon
+  template:
+    metadata:
+      labels:
+        app: zpowermon
+    spec:
+      containers:
+      - name: zpowermon
+        image: jdevelop/zpowermon:latest
+        env:
+          - name: RTL_TCP_HOST
+            value: "rtltcp"
+          - name: RTL_TCP_PORT
+            value: "1234"
+          - name: INFLUXDB_HOST
+            value: "influxdb"
+          - name: INFLUXDB_PORT
+            value: "8086"
+          - name: INFLUXDB_USER
+            value: "root"
+          - name: INFLUXDB_PASS
+            value: "root"
+          - name: INFLUXDB_NAME
+            value: "meters"

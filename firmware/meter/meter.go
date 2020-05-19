@@ -1,7 +1,6 @@
 package meter
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/bemasher/rtlamr/protocol"
 	"github.com/bemasher/rtltcp"
-	"go.uber.org/atomic"
 
 	_ "github.com/bemasher/rtlamr/scm"
 	_ "github.com/bemasher/rtlamr/scmplus"
@@ -65,43 +63,23 @@ func (m *Meter) Close() error {
 }
 
 type Counter struct {
-	sync.Pool
-	used, get, put *atomic.Int32
+	*sync.Pool
 }
 
 func (c *Counter) Get() []byte {
-	c.get.Inc()
 	return c.Pool.Get().([]byte)
 }
 
 func (c *Counter) Put(src []byte) {
-	c.put.Inc()
 	c.Pool.Put(src)
 }
 
 func (m *Meter) Run(consumer chan<- protocol.Message) error {
-	var buffer = Counter{
-		used: atomic.NewInt32(0),
-		get:  atomic.NewInt32(0),
-		put:  atomic.NewInt32(0),
-	}
-
-	buffer.Pool = sync.Pool{
+	buffer := Counter{&sync.Pool{
 		New: func() interface{} {
-			buffer.used.Inc()
 			return make([]byte, m.maxSize)
 		},
-	}
-	go func() {
-		for {
-			select {
-			case <-m.stop:
-				return
-			case <-time.After(1 * time.Second):
-				fmt.Printf("Allocated: %d, Get: %d, Put: %d\n", buffer.used.Load(), buffer.get.Load(), buffer.put.Load())
-			}
-		}
-	}()
+	}}
 
 	var bufferChan = make(chan []byte)
 	defer close(bufferChan)
