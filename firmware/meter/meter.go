@@ -19,11 +19,21 @@ type Meter struct {
 	decoder []*protocol.Decoder
 	maxSize int
 	stop    chan struct{}
+	status  MeterStatus
+	started time.Time
+	l       sync.RWMutex
 }
 
-var types = []string{"scm", "scm+"}
+type MeterStatus struct {
+	Uptime      time.Duration
+	Processed   uint64
+	Failed      uint64
+	LastFailure time.Time
+}
 
 const symLen = 72
+
+var types = []string{"scm", "scm+"}
 
 func NewMeter(rtlTcpAddr string) (*Meter, error) {
 	var m Meter
@@ -74,7 +84,19 @@ func (c *Counter) Put(src []byte) {
 	c.Pool.Put(src)
 }
 
+func (m *Meter) GetStatus() MeterStatus {
+	m.l.RLock()
+	defer m.l.RUnlock()
+	return MeterStatus{
+		Uptime:      time.Now().Sub(m.started),
+		Failed:      m.status.Failed,
+		LastFailure: m.status.LastFailure,
+		Processed:   m.status.Processed,
+	}
+}
+
 func (m *Meter) Run(consumer chan<- protocol.Message) error {
+	m.started = time.Now()
 	buffer := Counter{&sync.Pool{
 		New: func() interface{} {
 			return make([]byte, m.maxSize)
@@ -108,8 +130,15 @@ func (m *Meter) Run(consumer chan<- protocol.Message) error {
 							select {
 							case consumer <- msg:
 								// ok
+								m.l.Lock()
+								m.status.Processed++
+								m.l.Unlock()
 							case <-time.After(100 * time.Millisecond):
-								log.Printf("timeout for message processing")
+								m.l.Lock()
+								log.Printf("timeout for message processing: %+v", msg)
+								m.status.Failed++
+								m.status.LastFailure = time.Now()
+								m.l.Unlock()
 							}
 						}
 					}

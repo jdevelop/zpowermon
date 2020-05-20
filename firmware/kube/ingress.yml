@@ -1,0 +1,15 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: resolver-zpowermon
+  namespace: logs
+spec:
+  rules:
+  - host: zpowermon.local
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: zpowermon-service
+          servicePort: 80

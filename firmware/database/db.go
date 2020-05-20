@@ -45,15 +45,19 @@ func (db *Database) AddEvent(event *firmware.PowerEvent) error {
 		return err
 	}
 	tags := map[string]string{
-		"meterid": strconv.FormatUint(uint64(event.Message.EndpointID), 10),
+		"meterid":   strconv.FormatUint(uint64(event.EndpointID), 10),
+		"metertype": event.MeterType,
 	}
 
 	pointData := map[string]interface{}{
-		"meterid":     event.Message.EndpointID * 1.0,
-		"consumption": event.Message.Consumption * 1.0,
+		"consumption": event.Consumption * 1.0,
 	}
 
-	pt, err := client.NewPoint("meters", tags, pointData, event.Timestamp)
+	for k, v := range event.Fields {
+		pointData[k] = v
+	}
+
+	pt, err := client.NewPoint(db.dbname, tags, pointData, event.Timestamp)
 	if err != nil {
 		return err
 	}

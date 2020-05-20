@@ -1,0 +1,4 @@
+resources:
+  - ingress.yml
+  - kube-zpowermon.yml
+  - service.yml
