@@ -91,12 +91,6 @@ func main() {
 		time.Sleep(5 * time.Second)
 	}
 
-	m, err := meter.NewMeter(rtlHost + ":" + rtlPort)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer m.Close()
-
 	msgChan := make(chan protocol.Message)
 
 	go func() {
@@ -201,9 +195,14 @@ func main() {
 
 	log.Println("Starting ZPowerMon version", Version)
 
+	var m *meter.Meter
+
 	go func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+			if m == nil {
+				return
+			}
 			w.Header().Set("content-type", "application/json")
 			if err := json.NewEncoder(w).Encode(m.GetStatus()); err != nil {
 				log.Printf("can't encode link: %+v", err)
@@ -223,8 +222,19 @@ func main() {
 		}
 	}()
 
-	if err := m.Run(msgChan); err != nil {
-		log.Fatal(err)
+	for {
+		mtr, err := meter.NewMeter(rtlHost + ":" + rtlPort)
+		if err != nil {
+			log.Fatal(err)
+		}
+		m = mtr
+		fmt.Println("Reading meter...")
+		if err := m.Run(msgChan); err != nil {
+			log.Printf("Error processing: %+v", err)
+		}
+		m.Close()
+		time.Sleep(2 * time.Second)
+		fmt.Println("Restarting....")
 	}
 
 }
